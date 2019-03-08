@@ -51,14 +51,14 @@ last_layer_factor=0.1 # relates to modify_learning_rates.
 first_layer_factor=1.0 # relates to modify_learning_rates.
 stage=-5
 
-io_opts="--max-jobs-run 5" # for jobs with a lot of I/O, limits the number running at one time.   These don't
+io_opts="--max-jobs-run 16" # for jobs with a lot of I/O, limits the number running at one time.   These don't
 splice_width=4 # meaning +- 4 frames on each side for second LDA
 randprune=4.0 # speeds up LDA.
 alpha=4.0
 max_change=10.0
 mix_up=0 # Number of components to mix up to (should be > #tree leaves, if
          # specified.)
-num_threads=16
+num_threads=1
 parallel_opts="--num-threads 16 --mem 1G" # by default we use 16 threads; this lets the queue know.
   # note: parallel_opts doesn't automatically get adjusted if you adjust num-threads.
 cleanup=true
@@ -69,8 +69,10 @@ transform_dir=
 cmvn_opts=  # will be passed to get_lda.sh and get_egs.sh, if supplied.
             # only relevant for "raw" features, not lda.
 feat_type=  # can be used to force "raw" feature type.
+
 prior_subset_size=10000 # 10k samples per job, for computing priors.  Should be
                         # more than enough.
+m_vector=
 # End configuration section.
 
 
@@ -79,6 +81,7 @@ echo "$0 $@"  # Print the command line for logging
 if [ -f path.sh ]; then . ./path.sh; fi
 . parse_options.sh || exit 1;
 
+. ./cmd.sh
 
 if [ $# != 4 ]; then
   echo "Usage: $0 [opts] <data> <lang> <ali-dir> <exp-dir>"
@@ -158,10 +161,11 @@ extra_opts=()
 [ -z "$transform_dir" ] && transform_dir=$alidir
 extra_opts+=(--transform-dir $transform_dir)
 extra_opts+=(--splice-width $splice_width)
+[ ! -z "$m_vector" ] && extra_opts+=(--m_vector "$m_vector")
 
 if [ $stage -le -4 ]; then
   echo "$0: calling get_lda.sh"
-  steps/nnet2/get_lda.sh $lda_opts "${extra_opts[@]}" --cmd "$cmd" $data $lang $alidir $dir || exit 1;
+  steps/nnet2/get_lda.sh $lda_opts "${extra_opts[@]}" --cmd "$train_cmd" $data $lang $alidir $dir || exit 1;
 fi
 
 # these files will have been written by get_lda.sh
@@ -173,7 +177,7 @@ if [ $stage -le -3 ] && [ -z "$egs_dir" ]; then
   steps/nnet2/get_egs.sh $egs_opts "${extra_opts[@]}" \
       --samples-per-iter $samples_per_iter \
       --num-jobs-nnet $num_jobs_nnet --stage $get_egs_stage \
-      --cmd "$cmd" $egs_opts --io-opts "$io_opts" \
+      --cmd "$train_cmd" $egs_opts --io-opts "$io_opts" \
       $data $lang $alidir $dir || exit 1;
 fi
 
@@ -194,14 +198,19 @@ fi
 
 if [ $stage -le -2 ]; then
   echo "$0: initializing neural net";
+  if [ ! -z $m_vector ]; then 
+    m_vector_dim=`feat-to-dim scp:$m_vector/feats.scp -`
+  else
+    m_vector_dim=0
+  fi
 
   lda_mat=$dir/lda.mat
   ext_lda_dim=$lda_dim
-  ext_feat_dim=$feat_dim
+  ext_feat_dim=$[$feat_dim+$m_vector_dim]
 
   stddev=`perl -e "print 1.0/sqrt($hidden_layer_dim);"`
   cat >$dir/nnet.config <<EOF
-SpliceComponent input-dim=$ext_feat_dim left-context=$splice_width right-context=$splice_width
+SpliceComponent input-dim=$ext_feat_dim left-context=$splice_width right-context=$splice_width const-component-dim=$m_vector_dim
 FixedAffineComponent matrix=$lda_mat
 AffineComponentPreconditioned input-dim=$ext_lda_dim output-dim=$hidden_layer_dim alpha=$alpha max-change=$max_change learning-rate=$initial_learning_rate param-stddev=$stddev bias-stddev=$bias_stddev
 TanhComponent dim=$hidden_layer_dim

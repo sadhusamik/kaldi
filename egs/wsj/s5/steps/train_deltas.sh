@@ -22,6 +22,10 @@ norm_vars=false # deprecated.  Prefer --cmvn-opts "--norm-vars=true"
 cmvn_opts=
 delta_opts=
 context_opts=   # use"--context-width=5 --central-position=2" for quinphone
+
+m_vector=
+feat_type=delta
+
 # End configuration.
 
 echo "$0 $@"  # Print the command line for logging
@@ -71,7 +75,22 @@ $norm_vars && cmvn_opts="--norm-vars=true $cmvn_opts"
 echo $cmvn_opts  > $dir/cmvn_opts # keep track of options to CMVN.
 [ ! -z $delta_opts ] && echo $delta_opts > $dir/delta_opts
 
-feats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | add-deltas $delta_opts ark:- ark:- |"
+case $feat_type in 
+  plain) feats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- |";;
+  delta) feats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | add-deltas $delta_opts ark:- ark:- |";;
+  only_delta) feats="ark:copy-feats scp:$sdata/JOB/feats.scp ark:- | add-deltas $delta_opts ark:- ark:- |";;
+  *) echo "$0: Invalid feature tyep $feat_type";;
+esac
+
+ 
+if [ ! -z $m_vector ]; then 
+  echo "$0: Adding m-vectors to feature type $feat_type"
+  
+  utils/split_data.sh $m_vector $nj || exit 1;
+  
+  feats="$feats paste-feats --length-tolerance=4 ark:- scp:$m_vector/split${nj}/JOB/feats.scp ark:- |"
+
+fi
 
 rm $dir/.error 2>/dev/null
 

@@ -35,6 +35,7 @@ context_opts=   # use "--context-width=5 --central-position=2" for quinphone.
 # End configuration.
 train_tree=true  # if false, don't actually train the tree.
 use_lda_mat=  # If supplied, use this LDA[+MLLT] matrix.
+m_vector=
 
 echo "$0 $@"  # Print the command line for logging
 
@@ -89,9 +90,18 @@ split_data.sh $data $nj || exit 1;
 
 splicedfeats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | splice-feats $splice_opts ark:- ark:- |"
 # Note: $feats gets overwritten later in the script.
+
+if [ ! -z $m_vector ]; then 
+  
+  echo "$0: Adding m-vectors to feature type $feat_type"
+
+  utils/split_data.sh $m_vector $nj || exit 1;
+
+  splicedfeats="$splicedfeats paste-feats --length-tolerance=4 ark:- scp:$m_vector/split${nj}/JOB/feats.scp ark:- |"
+
+fi
+
 feats="$splicedfeats transform-feats $dir/0.mat ark:- ark:- |"
-
-
 
 if [ $stage -le -5 ]; then
   if [ -z "$use_lda_mat" ]; then

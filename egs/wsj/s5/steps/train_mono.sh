@@ -23,6 +23,9 @@ power=0.25 # exponent to determine number of gaussians from occurrence counts
 norm_vars=false # deprecated, prefer --cmvn-opts "--norm-vars=false"
 cmvn_opts=  # can be used to add extra options to cmvn.
 delta_opts= # can be used to add extra options to add-deltas
+feat_type=delta
+m_vector=
+
 # End configuration section.
 
 echo "$0 $@"  # Print the command line for logging
@@ -44,7 +47,10 @@ data=$1
 lang=$2
 dir=$3
 
+data_type=`basename $data`
+
 oov_sym=`cat $lang/oov.int` || exit 1;
+log_dir=$dir/log
 
 mkdir -p $dir/log
 echo $nj > $dir/num_jobs
@@ -57,7 +63,21 @@ $norm_vars && cmvn_opts="--norm-vars=true $cmvn_opts"
 echo $cmvn_opts  > $dir/cmvn_opts # keep track of options to CMVN.
 [ ! -z $delta_opts ] && echo $delta_opts > $dir/delta_opts # keep track of options to delta
 
-feats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | add-deltas $delta_opts ark:- ark:- |"
+case $feat_type in
+  only_delta) feats="ark:copy-feats scp:$sdata/JOB/feats.scp ark:- | add-deltas $delta_opts ark:- ark:- |";;
+  plain) feats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- |";;
+  delta) feats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | add-deltas $delta_opts ark:- ark:- |";;
+  *) echo "$0: Invalid feature type $feat_type"
+esac
+
+if [ ! -z $m_vector ]; then 
+  echo "$0: Appending m-vectors to $feat_type features" 
+  
+  utils/split_data.sh $m_vector $nj || exit 1;
+
+  feats="$feats paste-feats --length-tolerance=4 ark:- scp:$m_vector/split${nj}/JOB/feats.scp ark:- |"
+fi
+
 example_feats="`echo $feats | sed s/JOB/1/g`";
 
 echo "$0: Initializing monophone system."

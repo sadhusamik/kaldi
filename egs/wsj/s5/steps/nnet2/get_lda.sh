@@ -26,6 +26,7 @@ ivector_randomize_prob=0.0 # if >0.0, randomizes iVectors during training with
 ivector_dir=
 cmvn_opts=  # allows you to specify options for CMVN, if feature type is not lda.
 
+m_vector=
 echo "$0 $@"  # Print the command line for logging
 
 if [ -f path.sh ]; then . ./path.sh; fi
@@ -109,6 +110,7 @@ echo "$0: feature type is $feat_type"
 N=$[$num_feats/$nj]
 
 case $feat_type in
+  plain) feats="ark,s,cs:utils/subset_scp.pl --quiet $N $sdata/JOB/feats.scp | copy-feats scp:- ark:- |";;
   raw) feats="ark,s,cs:utils/subset_scp.pl --quiet $N $sdata/JOB/feats.scp | apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:- ark:- |"
     echo $cmvn_opts >$dir/cmvn_opts
    ;;
@@ -139,6 +141,12 @@ feat_dim=$(feat-to-dim "$feats_one" -) || exit 1;
 # by default: no dim reduction.
 
 spliced_feats="$feats splice-feats --left-context=$left_context --right-context=$right_context ark:- ark:- |"
+
+if [ ! -z "$m_vector" ]; then 
+  echo "$0: Adding m-vectors to feature type $feat_type"
+
+  spliced_feats="$spliced_feats paste-feats --length-tolerance=4 ark:- scp:$m_vector/feats.scp ark:- |"
+fi
 
 if [ ! -z "$online_ivector_dir" ]; then
   ivector_period=$(cat $online_ivector_dir/ivector_period) || exit 1;

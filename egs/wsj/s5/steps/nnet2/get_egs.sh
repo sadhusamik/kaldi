@@ -19,7 +19,7 @@ samples_per_iter=200000 # each iteration of training, see this many samples
 transform_dir=     # If supplied, overrides alidir
 num_jobs_nnet=16    # Number of neural net jobs to run in parallel
 stage=0
-io_opts="--max-jobs-run 5" # for jobs with a lot of I/O, limits the number running at one time.
+io_opts="--max-jobs-run 16" # for jobs with a lot of I/O, limits the number running at one time.
 splice_width=4 # meaning +- 4 frames on each side for second LDA
 left_context=
 right_context=
@@ -29,6 +29,7 @@ ivector_randomize_prob=0.0 # if >0.0, randomizes iVectors during training with
                            # this prob per iVector.
 cmvn_opts=  # can be used for specifying CMVN options, if feature type is not lda.
 
+m_vector=
 echo "$0 $@"  # Print the command line for logging
 
 if [ -f path.sh ]; then . ./path.sh; fi
@@ -118,6 +119,9 @@ fi
 echo "$0: feature type is $feat_type"
 
 case $feat_type in
+  plain) feats="ark,s,cs:utils/filter_scp.pl --exclude $dir/valid_uttlist $sdata/JOB/feats.scp | copy-feats scp:- ark:- |"
+    valid_feats="ark,s,cs:utils/filter_scp.pl $dir/valid_uttlist $data/feats.scp | copy-feats scp:- ark:- |"
+    train_subset_feats="ark,s,cs:utils/filter_scp.pl $dir/train_subset_uttlist $data/feats.scp | copy-feats scp:- ark:- |" ;;
   raw) feats="ark,s,cs:utils/filter_scp.pl --exclude $dir/valid_uttlist $sdata/JOB/feats.scp | apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:- ark:- |"
     valid_feats="ark,s,cs:utils/filter_scp.pl $dir/valid_uttlist $data/feats.scp | apply-cmvn $cmvn_opts --utt2spk=ark:$data/utt2spk scp:$data/cmvn.scp scp:- ark:- |"
     train_subset_feats="ark,s,cs:utils/filter_scp.pl $dir/train_subset_uttlist $data/feats.scp | apply-cmvn $cmvn_opts --utt2spk=ark:$data/utt2spk scp:$data/cmvn.scp scp:- ark:- |"
@@ -148,6 +152,17 @@ if [ -f $transform_dir/raw_trans.1 ] && [ $feat_type == "raw" ]; then
   valid_feats="$valid_feats transform-feats --utt2spk=ark:$data/utt2spk 'ark:cat $transform_dir/raw_trans.*|' ark:- ark:- |"
   train_subset_feats="$train_subset_feats transform-feats --utt2spk=ark:$data/utt2spk 'ark:cat $transform_dir/raw_trans.*|' ark:- ark:- |"
 fi
+
+if [ ! -z $m_vector ] ; then 
+
+  echo "$0: Adding m-vectors to feature type $feat_type" 
+
+  feats="$feats paste-feats --length-tolerance=4 ark:- scp:$m_vector/feats.scp ark:- |"
+  valid_feats="$valid_feats paste-feats --length-tolerance=4 ark:- scp:$m_vector/feats.scp ark:- |"
+  train_subset_feats="$train_subset_feats paste-feats --length-tolerance=4 ark:- scp:$m_vector/feats.scp ark:- |"
+fi
+
+
 if [ ! -z "$online_ivector_dir" ]; then
   feats_one="$(echo "$feats" | sed s:JOB:1:g)"
   ivector_dim=$(feat-to-dim scp:$online_ivector_dir/ivector_online.scp -) || exit 1;

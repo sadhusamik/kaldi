@@ -22,6 +22,10 @@ scoring_opts=
 # e.g. --scoring-opts "--min-lmwt 1 --max-lmwt 20"
 skip_scoring=false
 decode_extra_opts=
+no_delta=false
+only_delta=false
+m_vector=
+
 # End configuration section.
 
 echo "$0 $@"  # Print the command line for logging
@@ -84,7 +88,12 @@ for f in $sdata/1/feats.scp $sdata/1/cmvn.scp $model $graphdir/HCLG.fst; do
 done
 
 if [ -f $srcdir/final.mat ]; then feat_type=lda; else feat_type=delta; fi
+
+if $no_delta ; then feat_type=plain ; fi
+if $only_delta; then feat_type=only_delta; fi
+
 echo "decode.sh: feature type is $feat_type";
+
 
 splice_opts=`cat $srcdir/splice_opts 2>/dev/null` # frame-splicing options.
 cmvn_opts=`cat $srcdir/cmvn_opts 2>/dev/null`
@@ -93,11 +102,28 @@ delta_opts=`cat $srcdir/delta_opts 2>/dev/null`
 thread_string=
 [ $num_threads -gt 1 ] && thread_string="-parallel --num-threads=$num_threads"
 
+
+if [ ! -z $m_vector ]; then 
+  echo "$0: Adding m-vectors to feature type $feat_type" 
+  utils/split_data.sh $m_vector $nj || exit 1;
+fi
+
 case $feat_type in
   delta) feats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | add-deltas $delta_opts ark:- ark:- |";;
-  lda) feats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | splice-feats $splice_opts ark:- ark:- | transform-feats $srcdir/final.mat ark:- ark:- |";;
-  *) echo "Invalid feature type $feat_type" && exit 1;
+  lda) feats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | splice-feats  $splice_opts ark:- ark:- |"
+    
+    if [ ! -z $m_vector ]; then 
+      feats="$feats paste-feats --length-tolerance=4 ark:- scp:$m_vector/split${nj}/JOB/feats.scp ark:- |"
+    fi
+
+    feats="$feats transform-feats $srcdir/final.mat ark:- ark:- |";;
+  plain) feats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- |";;
+ # plain) feats="ark:copy-feats scp:$sdata/JOB/feats.scp ark:- |";;
+  only_delta) feats="ark:copy-feats scp:$sdata/JOB/feats.scp ark:- | add-deltas $delta_opts ark:- ark:- |";;
+  *) echo "Invalid feature type $feat_type" && exit 1;;
 esac
+
+
 if [ ! -z "$transform_dir" ]; then # add transforms to features...
   echo "Using fMLLR transforms from $transform_dir"
   [ ! -f $transform_dir/trans.1 ] && echo "Expected $transform_dir/trans.1 to exist."
@@ -115,6 +141,7 @@ if [ ! -z "$transform_dir" ]; then # add transforms to features...
     feats="$feats transform-feats --utt2spk=ark:$sdata/JOB/utt2spk ark:$transform_dir/trans.JOB ark:- ark:- |"
   fi
 fi
+
 
 if [ $stage -le 0 ]; then
   if [ -f "$graphdir/num_pdfs" ]; then

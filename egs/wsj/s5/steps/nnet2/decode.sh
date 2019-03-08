@@ -25,6 +25,7 @@ scoring_opts=
 skip_scoring=false
 feat_type=
 online_ivector_dir=
+m_vector=
 minimize=false
 # End configuration section.
 
@@ -84,6 +85,7 @@ fi
 splice_opts=`cat $srcdir/splice_opts 2>/dev/null`
 
 case $feat_type in
+  plain) feats="ark:copy-feats scp:$sdata/JOB/feats.scp ark:- |";;
   raw) feats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- |"
   if [ -f $srcdir/delta_order ]; then
     delta_order=`cat $srcdir/delta_order 2>/dev/null`
@@ -132,6 +134,12 @@ if [ ! -z "$online_ivector_dir" ]; then
   # note: subsample-feats, with negative n, will repeat each feature -n times.
   feats="$feats paste-feats --length-tolerance=$ivector_period ark:- 'ark,s,cs:utils/filter_scp.pl $sdata/JOB/utt2spk $online_ivector_dir/ivector_online.scp | subsample-feats --n=-$ivector_period scp:- ark:- | copy-matrix --scale=$ivector_scale ark:- ark:-|' ark:- |"
 fi
+
+if [ ! -z $m_vector ]; then
+  echo "$0: Appending m-vector to feature type $feat_type" 
+  feats="$feats paste-feats --length-tolerance=4 ark:- scp:$m_vector/feats.scp ark:- |"
+fi
+
 
 if [ $stage -le 1 ]; then
   $cmd --num-threads $num_threads JOB=1:$nj $dir/log/decode.JOB.log \

@@ -18,7 +18,7 @@
 cmd=run.pl
 num_epochs=15      # Number of epochs during which we reduce
                    # the learning rate; number of iteration is worked out from this.
-num_epochs_extra=5 # Number of epochs after we stop reducing
+num_epochs_extra=10 # Number of epochs after we stop reducing
                    # the learning rate.
 num_iters_final=20 # Maximum number of final iterations to give to the
                    # optimization over the validation set.

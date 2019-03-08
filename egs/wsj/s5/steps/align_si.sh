@@ -21,6 +21,9 @@ retry_beam=40
 careful=false
 boost_silence=1.0 # Factor by which to boost silence during alignment.
 # End configuration options.
+m_vector=
+use_plain=false
+only_delta=false
 
 echo "$0 $@"  # Print the command line for logging
 
@@ -72,13 +75,37 @@ cp $srcdir/final.occs $dir;
 if [ -f $srcdir/final.mat ]; then feat_type=lda; else feat_type=delta; fi
 echo "$0: feature type is $feat_type"
 
+if $only_delta; then
+  feat_type=only_delta
+fi
+
 case $feat_type in
+  only_delta) feats="ark:copy-feats scp:$sdata/JOB/feats.scp ark:- | add-deltas $delta_opts ark:- ark:- |" ;;
   delta) feats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | add-deltas $delta_opts ark:- ark:- |";;
-  lda) feats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | splice-feats $splice_opts ark:- ark:- | transform-feats $srcdir/final.mat ark:- ark:- |"
-    cp $srcdir/final.mat $srcdir/full.mat $dir
-   ;;
+  lda) feats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | splice-feats $splice_opts ark:- ark:- |" 
+    
+    if [ $m_vector ]; then 
+      feats="$feats paste-feats --length-tolerance=4 ark:- scp:$m_vector/feats.scp ark:- |"
+    fi
+
+    feats="$feats transform-feats $srcdir/final.mat ark:- ark:- |"
+   
+    cp $srcdir/final.mat $srcdir/full.mat $dir;;
   *) echo "$0: invalid feature type $feat_type" && exit 1;
 esac
+
+if $use_plain; then
+  feats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- |";
+  echo "$0: Changed feat type to plain"
+fi
+
+if [ ! -z $m_vector ]; then 
+  echo "$0: Adding m-vectors to feature type $feat_type"
+
+  utils/split_data.sh  $m_vector $nj || exit 1;
+
+  feats="$feats paste-feats --length-tolerance=4 ark:- scp:$m_vector/split${nj}/JOB/feats.scp ark:- |"  
+fi
 
 echo "$0: aligning data in $data using model from $srcdir, putting alignments in $dir"
 

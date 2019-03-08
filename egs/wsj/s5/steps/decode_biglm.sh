@@ -11,6 +11,8 @@ beam=13.0
 lattice_beam=6.0
 acwt=0.083333
 skip_scoring=false
+m_vector=
+
 # End configuration.
 
 echo "$0 $@"  # Print the command line for logging
@@ -60,11 +62,25 @@ done
 if [ -f $srcdir/final.mat ]; then feat_type=lda; else feat_type=delta; fi
 echo "decode_si.sh: feature type is $feat_type"
 
+
+if [ ! -z $m_vector ]; then 
+  echo "$0: Adding m-vectors to feature type $feat_type"
+  utils/split_data.sh $m_vector $nj || exit 1;
+fi  
+
 case $feat_type in
   delta) feats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | add-deltas $delta_opts ark:- ark:- |";;
-  lda) feats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | splice-feats $splice_opts ark:- ark:- | transform-feats $srcdir/final.mat ark:- ark:- |";;
+  lda) feats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | splice-feats $splice_opts ark:- ark:- | "
+    
+    if [ ! -z $m_vector ]; then 
+      feats="$feats paste-feats --length-tolerance=4 ark:- scp:$m_vector/split${nj}/JOB/feats.scp ark:- |"
+    fi
+
+    feats="$feats transform-feats $srcdir/final.mat ark:- ark:- |";;
+
   *) echo "Invalid feature type $feat_type" && exit 1;
 esac
+
 
 [ -f `dirname $oldlm_fst`/words.txt ] && ! cmp `dirname $oldlm_fst`/words.txt $graphdir/words.txt && \
   echo "Warning: old LM words.txt does not match with that in $graphdir .. probably will not work.";
