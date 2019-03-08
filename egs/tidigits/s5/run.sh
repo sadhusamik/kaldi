@@ -20,7 +20,7 @@ utils/validate_lang.pl data/lang/ # Note; this actually does report errors,
    # and exits with status 1, but we've checked them and seen that they
    # don't matter (this setup doesn't have any disambiguation symbols,
    # and the script doesn't like that).
-
+exit
 # Now make MFCC features.
 # mfccdir should be some place with a largish disk where you
 # want to store MFCC features.

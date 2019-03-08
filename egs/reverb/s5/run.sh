@@ -123,7 +123,7 @@ if [ $stage -le 2 ]; then
   # so we pass it as 4th argument
   local/REVERB_mcwsjav_data_prep.sh $reverb_real_et REVERB_Real_et et $reverb_real_dt/mlf/WSJ.mlf
 fi
-
+exit
 if [ $stage -le 3 ]; then
   # Extract MFCC features for clean sets.
   # For the non-clean data sets, this is outsourced to the data preparation scripts.
