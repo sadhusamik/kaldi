@@ -35,6 +35,8 @@ train_tree=true
 tree_stats_opts=
 cluster_phones_opts=
 compile_questions_opts=
+
+no_splice=false
 # End configuration section.
 
 echo "$0 $@"  # Print the command line for logging
@@ -92,10 +94,22 @@ echo $nj >$dir/num_jobs
 if [ -f $alidir/final.mat ]; then feat_type=lda; else feat_type=delta; fi
 echo "$0: feature type is $feat_type"
 
+if $no_splice ; then
+  # Change feature type to no_splice
+
+  echo "Changing feature type from $feat_type to no_splice"
+
+  feat_type=no_splice
+fi
+
 ## Set up speaker-independent features.
 case $feat_type in
   delta) sifeats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | add-deltas $delta_opts ark:- ark:- |";;
   lda) sifeats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | splice-feats $splice_opts ark:- ark:- | transform-feats $alidir/final.mat ark:- ark:- |"
+    cp $alidir/final.mat $dir
+    cp $alidir/full.mat $dir 2>/dev/null
+    ;;
+  no_splice) sifeats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | transform-feats $alidir/final.mat ark:- ark:- |"
     cp $alidir/final.mat $dir
     cp $alidir/full.mat $dir 2>/dev/null
     ;;

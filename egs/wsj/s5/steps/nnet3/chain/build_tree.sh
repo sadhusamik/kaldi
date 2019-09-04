@@ -27,6 +27,7 @@ leftmost_questions_truncate=-1  # note: this option is deprecated and has no eff
 tree_stats_opts=
 cluster_phones_opts=
 repeat_frames=false
+no_splice=false
 # End configuration section.
 
 echo "$0 $@"  # Print the command line for logging
@@ -101,10 +102,19 @@ fi
 if [ -f $alidir/final.mat ]; then feat_type=lda; else feat_type=delta; fi
 echo "$0: feature type is $feat_type"
 
+if $no_splice ; then 
+  echo "$0: Changing feature type from $feat_type to nosplice_lda"
+  feat_type=nosplice_lda
+fi
+
 ## Set up speaker-independent features.
 case $feat_type in
   delta) feats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | add-deltas $delta_opts ark:- ark:- |";;
   lda) feats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | splice-feats $splice_opts ark:- ark:- | transform-feats $alidir/final.mat ark:- ark:- |"
+    cp $alidir/final.mat $dir
+    cp $alidir/full.mat $dir 2>/dev/null
+    ;;
+  nosplice_lda) feats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | transform-feats $alidir/final.mat ark:- ark:- |"
     cp $alidir/final.mat $dir
     cp $alidir/full.mat $dir 2>/dev/null
     ;;

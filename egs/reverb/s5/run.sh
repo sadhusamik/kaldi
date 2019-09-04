@@ -118,16 +118,9 @@ if [ $stage -le 5 ]; then
     utils/data/modify_speaker_info.sh --seconds-per-spk-max 180 data/${dset}_nosplit data/${dset}
   done
 fi
-<<<<<<< HEAD
 exit
-if [ $stage -le 3 ]; then
-  # Extract MFCC features for clean sets.
-  # For the non-clean data sets, this is outsourced to the data preparation scripts.
-=======
-
 if [ $stage -le 6 ]; then
   # Extract MFCC features for train and test sets.
->>>>>>> upstream/master
   mfccdir=mfcc
   for x in ${train_set} ${test_sets}; do
    steps/make_mfcc.sh --cmd "$train_cmd" --nj 30 \

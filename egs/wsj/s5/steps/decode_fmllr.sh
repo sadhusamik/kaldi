@@ -48,6 +48,9 @@ scoring_opts=
 max_fmllr_jobs=25  # I've seen the fMLLR jobs overload NFS badly if the decoding
                    # was started with a lot of many jobs, so we limit the number of
                    # parallel jobs to 25 by default.  End configuration section
+no_splice=false
+no_delta=false
+
 echo "$0 $@"  # Print the command line for logging
 
 [ -f ./path.sh ] && . ./path.sh; # source the path.
@@ -116,7 +119,11 @@ if [ -z "$si_dir" ]; then # we need to do the speaker-independent decoding pass.
       [ "`cat $graphdir/num_pdfs`" -eq `am-info --print-args=false $alignment_model | grep pdfs | awk '{print $NF}'` ] || \
         { echo "Mismatch in number of pdfs with $alignment_model"; exit 1; }
     fi
-    steps/decode.sh --scoring-opts "$scoring_opts" \
+    add_opts=""
+    if $no_delta ; then 
+      add_opts="$add_opts --no_delta true"
+    fi
+    steps/decode.sh $add_opts --scoring-opts "$scoring_opts" \
            --num-threads $num_threads --skip-scoring $skip_scoring \
            --acwt $acwt --nj $nj --cmd "$cmd" --beam $first_beam \
            --model $alignment_model --max-active \
@@ -138,9 +145,17 @@ done
 ## Set up the unadapted features "$sifeats"
 if [ -f $srcdir/final.mat ]; then feat_type=lda; else feat_type=delta; fi
 echo "$0: feature type is $feat_type";
+
+if $no_splice ; then
+  
+  echo "Changing feature type from $feat_type to no_splice"
+  feat_type=no_splice
+fi
+
 case $feat_type in
   delta) sifeats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | add-deltas $delta_opts ark:- ark:- |";;
   lda) sifeats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | splice-feats $splice_opts ark:- ark:- | transform-feats $srcdir/final.mat ark:- ark:- |";;
+  no_splice) sifeats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | transform-feats $srcdir/final.mat ark:- ark:- |";;
   *) echo "Invalid feature type $feat_type" && exit 1;
 esac
 ##

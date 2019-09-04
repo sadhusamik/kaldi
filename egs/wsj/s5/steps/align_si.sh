@@ -24,6 +24,7 @@ boost_silence=1.0 # Factor by which to boost silence during alignment.
 m_vector=
 use_plain=false
 only_delta=false
+no_splice=false
 
 echo "$0 $@"  # Print the command line for logging
 
@@ -79,6 +80,12 @@ if $only_delta; then
   feat_type=only_delta
 fi
 
+if $no_splice; then 
+
+  echo "Changing feature type from $feat_type to no_splice"
+  feat_type=no_splice
+fi
+
 case $feat_type in
   only_delta) feats="ark:copy-feats scp:$sdata/JOB/feats.scp ark:- | add-deltas $delta_opts ark:- ark:- |" ;;
   delta) feats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | add-deltas $delta_opts ark:- ark:- |";;
@@ -90,6 +97,9 @@ case $feat_type in
 
     feats="$feats transform-feats $srcdir/final.mat ark:- ark:- |"
    
+    cp $srcdir/final.mat $srcdir/full.mat $dir;;
+  no_splice) feats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- |" 
+    feats="$feats transform-feats $srcdir/final.mat ark:- ark:- |"
     cp $srcdir/final.mat $srcdir/full.mat $dir;;
   *) echo "$0: invalid feature type $feat_type" && exit 1;
 esac

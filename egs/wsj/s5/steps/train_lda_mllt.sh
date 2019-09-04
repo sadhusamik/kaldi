@@ -36,6 +36,7 @@ context_opts=   # use "--context-width=5 --central-position=2" for quinphone.
 train_tree=true  # if false, don't actually train the tree.
 use_lda_mat=  # If supplied, use this LDA[+MLLT] matrix.
 m_vector=
+no_splice=false
 
 echo "$0 $@"  # Print the command line for logging
 
@@ -88,7 +89,12 @@ echo $cmvn_opts > $dir/cmvn_opts # keep track of options to CMVN.
 sdata=$data/split$nj;
 split_data.sh $data $nj || exit 1;
 
-splicedfeats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | splice-feats $splice_opts ark:- ark:- |"
+if $no_splice ; then
+  splicedfeats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- |"
+else
+  splicedfeats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | splice-feats $splice_opts ark:- ark:- |"
+fi
+
 # Note: $feats gets overwritten later in the script.
 
 if [ ! -z $m_vector ]; then 

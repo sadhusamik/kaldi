@@ -24,6 +24,8 @@ retry_beam=40
 careful=false
 boost_silence=1.0 # factor by which to boost silence during alignment.
 fmllr_update_type=full
+no_splice=false
+
 # End configuration options.
 
 echo "$0 $@"  # Print the command line for logging
@@ -72,9 +74,18 @@ cp $srcdir/delta_opts $dir 2>/dev/null
 if [ -f $srcdir/final.mat ]; then feat_type=lda; else feat_type=delta; fi
 echo "$0: feature type is $feat_type"
 
+if $no_splice ; then 
+  echo "Changing feature type from $feat_type to no_splice"
+  feat_type=no_splice
+fi
+
 case $feat_type in
   delta) sifeats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | add-deltas $delta_opts ark:- ark:- |";;
   lda) sifeats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | splice-feats $splice_opts ark:- ark:- | transform-feats $srcdir/final.mat ark:- ark:- |"
+    cp $srcdir/final.mat $dir
+    cp $srcdir/full.mat $dir 2>/dev/null
+   ;;
+  no_splice) sifeats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | transform-feats $srcdir/final.mat ark:- ark:- |"
     cp $srcdir/final.mat $dir
     cp $srcdir/full.mat $dir 2>/dev/null
    ;;

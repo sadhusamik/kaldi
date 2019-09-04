@@ -240,6 +240,8 @@ num_iters_reduce=$[$num_epochs * $iters_per_epoch];
 num_iters_extra=$[$num_epochs_extra * $iters_per_epoch];
 num_iters=$[$num_iters_reduce+$num_iters_extra]
 
+echo $num_iters > $dir/num_iters
+
 echo "$0: Will train for $num_epochs + $num_epochs_extra epochs, equalling "
 echo "$0: $num_iters_reduce + $num_iters_extra = $num_iters iterations, "
 echo "$0: (while reducing learning rate) + (with constant learning rate)."

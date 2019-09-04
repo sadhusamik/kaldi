@@ -24,6 +24,7 @@ final_beam=20  # For the lattice-generation phase there is no retry-beam.  This
 boost_silence=1.0 # factor by which to boost silence during alignment.
 fmllr_update_type=full
 generate_ali_from_lats=false # If true, alingments generated from lattices.
+no_splice=false
 # End configuration options.
 
 echo "$0 $@"  # Print the command line for logging
@@ -71,9 +72,19 @@ cp $srcdir/delta_opts $dir 2>/dev/null
 if [ -f $srcdir/final.mat ]; then feat_type=lda; else feat_type=delta; fi
 echo "$0: feature type is $feat_type"
 
+
+if $no_splice ; then
+  echo "$0: Changing feature type from $feat_type to nosplice_lda"
+  feat_type=nosplice_lda
+fi
+
 case $feat_type in
   delta) sifeats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | add-deltas $delta_opts ark:- ark:- |";;
   lda) sifeats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | splice-feats $splice_opts ark:- ark:- | transform-feats $srcdir/final.mat ark:- ark:- |"
+    cp $srcdir/final.mat $dir
+    cp $srcdir/full.mat $dir 2>/dev/null
+   ;;
+  nosplice_lda) sifeats="ark,s,cs:apply-cmvn $cmvn_opts --utt2spk=ark:$sdata/JOB/utt2spk scp:$sdata/JOB/cmvn.scp scp:$sdata/JOB/feats.scp ark:- | transform-feats $srcdir/final.mat ark:- ark:- |"
     cp $srcdir/final.mat $dir
     cp $srcdir/full.mat $dir 2>/dev/null
    ;;
