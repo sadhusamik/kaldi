@@ -7,7 +7,7 @@
 # in data/local/, and converts it into the "canonical" form,
 # in various subdirectories of data/, e.g. data/lang, data/train, etc.
 
-. ./path.sh || exit 1;
+. ./path.sh
 
 echo "Preparing train, dev and test data"
 srcdir=data/local/data
